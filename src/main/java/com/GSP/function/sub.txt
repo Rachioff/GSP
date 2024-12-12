@@ -1,0 +1,328 @@
+// 表达式节点的抽象基类
+public abstract class ExpressionNode {
+    public abstract double evaluate(double x);
+    public abstract ExpressionNode derivative();
+    public abstract String toString();
+}
+
+// 常数节点
+public class ConstantNode extends ExpressionNode {
+    private double value;
+    
+    public ConstantNode(double value) {
+        this.value = value;
+    }
+    
+    @Override
+    public double evaluate(double x) {
+        return value;
+    }
+    
+    @Override
+    public ExpressionNode derivative() {
+        return new ConstantNode(0);
+    }
+    
+    @Override
+    public String toString() {
+        return String.valueOf(value);
+    }
+}
+
+// 变量节点
+public class VariableNode extends ExpressionNode {
+    @Override
+    public double evaluate(double x) {
+        return x;
+    }
+    
+    @Override
+    public ExpressionNode derivative() {
+        return new ConstantNode(1);
+    }
+    
+    @Override
+    public String toString() {
+        return "x";
+    }
+}
+
+// 二元运算符节点
+public class BinaryOperatorNode extends ExpressionNode {
+    private String operator;
+    private ExpressionNode left, right;
+    
+    public BinaryOperatorNode(String operator, ExpressionNode left, ExpressionNode right) {
+        this.operator = operator;
+        this.left = left;
+        this.right = right;
+    }
+    
+    @Override
+    public double evaluate(double x) {
+        double leftVal = left.evaluate(x);
+        double rightVal = right.evaluate(x);
+        
+        return switch(operator) {
+            case "+" -> leftVal + rightVal;
+            case "-" -> leftVal - rightVal;
+            case "*" -> leftVal * rightVal;
+            case "/" -> {
+                if (Math.abs(rightVal) < 1e-10) {
+                    throw new ArithmeticException("Division by zero");
+                }
+                yield leftVal / rightVal;
+            }
+            case "^" -> Math.pow(leftVal, rightVal);
+            default -> throw new UnsupportedOperationException("Unknown operator: " + operator);
+        };
+    }
+    
+    @Override
+    public ExpressionNode derivative() {
+        return switch(operator) {
+            case "+" -> new BinaryOperatorNode("+", left.derivative(), right.derivative());
+            case "-" -> new BinaryOperatorNode("-", left.derivative(), right.derivative());
+            case "*" -> new BinaryOperatorNode("+",
+                new BinaryOperatorNode("*", left.derivative(), right),
+                new BinaryOperatorNode("*", left, right.derivative()));
+            case "/" -> new BinaryOperatorNode("/",
+                new BinaryOperatorNode("-",
+                    new BinaryOperatorNode("*", left.derivative(), right),
+                    new BinaryOperatorNode("*", left, right.derivative())),
+                new BinaryOperatorNode("^", right, new ConstantNode(2)));
+            case "^" -> new BinaryOperatorNode("*",
+                new BinaryOperatorNode("^", left, right),
+                new BinaryOperatorNode("+",
+                    new BinaryOperatorNode("*", right.derivative(), new FunctionNode("ln", left)),
+                    new BinaryOperatorNode("*", right, new BinaryOperatorNode("/", left.derivative(), left))));
+            default -> throw new UnsupportedOperationException("Unknown operator: " + operator);
+        };
+    }
+    
+    @Override
+    public String toString() {
+        return "(" + left.toString() + " " + operator + " " + right.toString() + ")";
+    }
+}
+
+// 函数节点（处理对数、三角函数等）
+public class FunctionNode extends ExpressionNode {
+    private String functionName;
+    private ExpressionNode argument;
+    private Integer base; // 用于对数函数的底数
+    
+    public FunctionNode(String functionName, ExpressionNode argument) {
+        this(functionName, argument, null);
+    }
+    
+    public FunctionNode(String functionName, ExpressionNode argument, Integer base) {
+        this.functionName = functionName;
+        this.argument = argument;
+        this.base = base;
+    }
+    
+    @Override
+    public double evaluate(double x) {
+        double arg = argument.evaluate(x);
+        return switch(functionName) {
+            case "sin" -> Math.sin(arg);
+            case "cos" -> Math.cos(arg);
+            case "tan" -> Math.tan(arg);
+            case "ln" -> Math.log(arg);
+            case "log" -> {
+                if (base == null) throw new IllegalStateException("Base not specified for log");
+                yield Math.log(arg) / Math.log(base);
+            }
+            default -> throw new UnsupportedOperationException("Unknown function: " + functionName);
+        };
+    }
+    
+    @Override
+    public ExpressionNode derivative() {
+        return switch(functionName) {
+            case "sin" -> new BinaryOperatorNode("*", 
+                new FunctionNode("cos", argument),
+                argument.derivative());
+            case "cos" -> new BinaryOperatorNode("*",
+                new BinaryOperatorNode("*", new ConstantNode(-1), new FunctionNode("sin", argument)),
+                argument.derivative());
+            case "tan" -> new BinaryOperatorNode("*",
+                new BinaryOperatorNode("+", new ConstantNode(1), 
+                    new BinaryOperatorNode("^", new FunctionNode("tan", argument), new ConstantNode(2))),
+                argument.derivative());
+            case "ln" -> new BinaryOperatorNode("*",
+                new BinaryOperatorNode("/", new ConstantNode(1), argument),
+                argument.derivative());
+            case "log" -> new BinaryOperatorNode("*",
+                new BinaryOperatorNode("/", new ConstantNode(1), 
+                    new BinaryOperatorNode("*", argument, new FunctionNode("ln", new ConstantNode(base)))),
+                argument.derivative());
+            default -> throw new UnsupportedOperationException("Unknown function: " + functionName);
+        };
+    }
+    
+    @Override
+    public String toString() {
+        if ("log".equals(functionName)) {
+            return "log(" + base + "," + argument.toString() + ")";
+        }
+        return functionName + "(" + argument.toString() + ")";
+    }
+}
+
+// 表达式解析器
+public class ExpressionParser {
+    private String expression;
+    private int position;
+    
+    public ExpressionParser(String expression) {
+        this.expression = expression.replaceAll("\\s+", "");
+        this.position = 0;
+    }
+    
+    public ExpressionNode parse() {
+        ExpressionNode node = parseAddSubtract();
+        if (position < expression.length()) {
+            throw new IllegalArgumentException("Unexpected character at position " + position);
+        }
+        return node;
+    }
+    
+    private ExpressionNode parseAddSubtract() {
+        ExpressionNode left = parseMultiplyDivide();
+        while (position < expression.length()) {
+            char op = expression.charAt(position);
+            if (op != '+' && op != '-') break;
+            position++;
+            ExpressionNode right = parseMultiplyDivide();
+            left = new BinaryOperatorNode(String.valueOf(op), left, right);
+        }
+        return left;
+    }
+    
+    private ExpressionNode parseMultiplyDivide() {
+        ExpressionNode left = parsePower();
+        while (position < expression.length()) {
+            char op = expression.charAt(position);
+            if (op != '*' && op != '/') break;
+            position++;
+            ExpressionNode right = parsePower();
+            left = new BinaryOperatorNode(String.valueOf(op), left, right);
+        }
+        return left;
+    }
+    
+    private ExpressionNode parsePower() {
+        ExpressionNode left = parsePrimary();
+        while (position < expression.length()) {
+            char op = expression.charAt(position);
+            if (op != '^') break;
+            position++;
+            ExpressionNode right = parsePrimary();
+            left = new BinaryOperatorNode(String.valueOf(op), left, right);
+        }
+        return left;
+    }
+    
+    private ExpressionNode parsePrimary() {
+        if (position >= expression.length()) {
+            throw new IllegalArgumentException("Unexpected end of expression");
+        }
+        
+        char c = expression.charAt(position);
+        
+        // 处理数字
+        if (Character.isDigit(c) || c == '.') {
+            StringBuilder number = new StringBuilder();
+            while (position < expression.length() && 
+                   (Character.isDigit(expression.charAt(position)) || 
+                    expression.charAt(position) == '.')) {
+                number.append(expression.charAt(position++));
+            }
+            return new ConstantNode(Double.parseDouble(number.toString()));
+        }
+        
+        // 处理变量
+        if (c == 'x') {
+            position++;
+            return new VariableNode();
+        }
+        
+        // 处理括号
+        if (c == '(') {
+            position++;
+            ExpressionNode node = parseAddSubtract();
+            if (position >= expression.length() || expression.charAt(position) != ')') {
+                throw new IllegalArgumentException("Missing closing parenthesis");
+            }
+            position++;
+            return node;
+        }
+        
+        // 处理函数
+        if (Character.isLetter(c)) {
+            StringBuilder funcName = new StringBuilder();
+            while (position < expression.length() && Character.isLetter(expression.charAt(position))) {
+                funcName.append(expression.charAt(position++));
+            }
+            
+            if (position < expression.length() && expression.charAt(position) == '(') {
+                position++; // 跳过左括号
+                
+                if ("log".equals(funcName.toString())) {
+                    // 处理 log(base,arg) 格式
+                    StringBuilder baseStr = new StringBuilder();
+                    while (position < expression.length() && Character.isDigit(expression.charAt(position))) {
+                        baseStr.append(expression.charAt(position++));
+                    }
+                    if (position < expression.length() && expression.charAt(position) == ',') {
+                        position++; // 跳过逗号
+                        ExpressionNode arg = parseAddSubtract();
+                        if (position < expression.length() && expression.charAt(position) == ')') {
+                            position++; // 跳过右括号
+                            return new FunctionNode("log", arg, Integer.parseInt(baseStr.toString()));
+                        }
+                    }
+                    throw new IllegalArgumentException("Invalid log function format");
+                } else {
+                    // 处理其他函数
+                    ExpressionNode arg = parseAddSubtract();
+                    if (position < expression.length() && expression.charAt(position) == ')') {
+                        position++; // 跳过右括号
+                        return new FunctionNode(funcName.toString(), arg);
+                    }
+                    throw new IllegalArgumentException("Invalid function format");
+                }
+            }
+        }
+        
+        throw new IllegalArgumentException("Unexpected character at position " + position + ": " + c);
+    }
+}
+
+// 主类用法示例
+public class MathExpression {
+    private ExpressionNode root;
+    
+    public MathExpression(String expression) {
+        ExpressionParser parser = new ExpressionParser(expression);
+        this.root = parser.parse();
+    }
+    
+    public double evaluate(double x) {
+        return root.evaluate(x);
+    }
+    
+    public MathExpression derivative() {
+        // 创建一个新的MathExpression对象，但不通过解析而是直接设置其根节点
+        MathExpression result = new MathExpression("");
+        result.root = root.derivative();
+        return result;
+    }
+    
+    @Override
+    public String toString() {
+        return root.toString();
+    }
+}
