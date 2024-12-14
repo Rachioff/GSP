@@ -71,4 +71,16 @@ public class FunctionNode extends ExpressionNode {
         }
         return functionName + "(" + argument.toString() + ")";
     }
+
+    public ExpressionNode getArgument() {
+        return argument;
+    }
+
+    public String getFunctionName() {
+        return functionName;
+    }
+
+    public Integer getBase() {
+        return base;
+    }
 }

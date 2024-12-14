@@ -62,6 +62,52 @@ public class BinaryOperatorNode extends ExpressionNode {
 
     @Override
     public String toString() {
-        return "(" + left.toString() + operator + right.toString() + ")";
+        String leftStr = left.toString();
+        String rightStr = right.toString();
+        
+        // 优化括号的使用
+        boolean needLeftParen = left instanceof BinaryOperatorNode &&
+            (getPrecedence(((BinaryOperatorNode) left).operator) < getPrecedence(operator) ||
+             (getPrecedence(((BinaryOperatorNode) left).operator) == getPrecedence(operator) && 
+              !isAssociative(operator)));
+              
+        boolean needRightParen = right instanceof BinaryOperatorNode &&
+            (getPrecedence(((BinaryOperatorNode) right).operator) < getPrecedence(operator) ||
+             getPrecedence(((BinaryOperatorNode) right).operator) == getPrecedence(operator));
+        
+        return (needLeftParen ? "(" : "") + leftStr + (needLeftParen ? ")" : "") + 
+               operator + 
+               (needRightParen ? "(" : "") + rightStr + (needRightParen ? ")" : "");
+    }
+
+    // 获取运算符优先级
+    private int getPrecedence(String op) {
+        return switch(op) {
+            case "+", "-" -> 1;
+            case "*", "/" -> 2;
+            case "^" -> 3;
+            default -> 0;
+        };
+    }
+
+    // 判断运算符是否满足结合律
+    private boolean isAssociative(String op) {
+        return switch(op) {
+            case "+", "*" -> true;
+            case "-", "/", "^" -> false;
+            default -> false;
+        };
+    }
+
+    public ExpressionNode getLeft() {
+        return left;
+    }
+    
+    public ExpressionNode getRight() {
+        return right;
+    }
+
+    public String getOperator() {
+        return operator;
     }
 }

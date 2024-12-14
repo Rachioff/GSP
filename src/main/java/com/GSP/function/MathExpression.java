@@ -10,7 +10,10 @@ public class MathExpression {
         ExpressionParser parser = new ExpressionParser(expression);
         
         // 不能解析空字符串，但是求导的时候会传入，所以也不能直接异常处理。。。
-        if (!expression.equals("")) this.root = parser.parse();  
+        if (!expression.equals("")) {
+            this.root = parser.parse();  
+            this.root = ExpressionSimplifier.simplify(this.root);
+        }
     }
     
     public double evaluate(double x) {
@@ -21,6 +24,7 @@ public class MathExpression {
         // 创建一个新的MathExpression对象，但不通过解析而是直接设置其根节点
         MathExpression result = new MathExpression("");
         result.root = root.derivative();
+        result.root = ExpressionSimplifier.simplify(result.root);
         return result;
     }
     

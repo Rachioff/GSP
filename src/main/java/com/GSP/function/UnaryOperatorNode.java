@@ -36,4 +36,12 @@ public class UnaryOperatorNode extends ExpressionNode {
     public String toString() {
         return operator + operand.toString();
     }
+
+    public ExpressionNode getOperand() {
+        return operand;
+    }
+
+    public String getOperator() {
+        return operator;
+    }
 }

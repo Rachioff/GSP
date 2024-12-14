@@ -25,4 +25,8 @@ public class ConstantNode extends ExpressionNode {
         // if (value == 0) return "";  // 如果是0返回空字符串
         return String.valueOf(value);
     }
+
+    public double getValue() {
+        return value;
+    }
 }
