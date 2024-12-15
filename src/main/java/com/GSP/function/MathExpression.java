@@ -39,7 +39,7 @@ public class MathExpression {
 
     public static void main(String[] args) {
         try {
-            MathExpression expr = new MathExpression("sin(x) * 2 + 1");
+            MathExpression expr = new MathExpression("x^2 - x + 1");
             MathExpression der = expr.derivative();
             System.out.println("derive of " + expr.toString() + " is " + der.toString());
         } catch (Exception e) {

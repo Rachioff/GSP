@@ -66,7 +66,7 @@ public abstract class Function {
     }
 
     public static void main(String[] args) {
-        ComplexFunction f = new ComplexFunction("-x^2+1");
+        ComplexFunction f = new ComplexFunction("-x^2+x^2+1");
         Function der = f.derivative();
         System.out.println(der.toString());
         System.out.println(der.evaluate(2));
