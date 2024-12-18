@@ -161,6 +161,32 @@
         .function-item button:hover {
             background: #cc0000;
         }
+        .input-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .section-title {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .shape-list {
+            margin-top: 20px;
+            border: 1px solid #eee;
+            padding: 10px;
+            max-height: calc(50vh - 200px);
+            overflow-y: auto;
+        }
+        .shape-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f0f7ff;
+            border-radius: 4px;
+        }
         .error {
             color: red;
             margin-top: 5px;
@@ -179,24 +205,52 @@
                         <span class="toggle-icon"></span>
                     </div>
                     <h2>GSP几何画板</h2>
-                    <div class="input-container">
-                        <input v-model="newFunction" 
-                               placeholder="输入函数表达式(不要省略运算符)"
-                               @keyup.enter="addFunction">
-                        <button @click="addFunction">添加</button>
-                        <div v-if="error" class="error">{{ error }}</div>
+                    <div class="input-section">
+                        <div class="section-title">函数绘制</div>
+                        <div class="input-container">
+                            <input v-model="newFunction" 
+                                   placeholder="输入函数表达式(不要省略运算符)"
+                                   @keyup.enter="addFunction">
+                            <button @click="addFunction">添加</button>
+                            <div v-if="functionError" class="error">{{ functionError }}</div>
+                        </div>
+                        
+                        <div class="function-list">
+                            <h3>已添加的函数</h3>
+                            <div v-if="Object.keys(functions).length === 0">
+                                暂无函数
+                            </div>
+                            <div v-else v-for="(expr, id) in functions" 
+                                 :key="id" 
+                                 class="function-item">
+                                <span>y = {{ expr }}</span>
+                                <button @click="deleteFunction(id)">删除</button>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="function-list">
-                        <h3>已添加的函数</h3>
-                        <div v-if="Object.keys(functions).length === 0">
-                            暂无函数
+                    <!-- 图形输入区域 -->
+                    <div class="input-section">
+                        <div class="section-title">图形绘制</div>
+                        <div class="input-container">
+                            <input v-model="newShape" 
+                                   placeholder="输入图形表达式(如: x^2/a^2 + y^2/3^2 = 1)"
+                                   @keyup.enter="addShape">
+                            <button @click="addShape">添加</button>
+                            <div v-if="shapeError" class="error">{{ shapeError }}</div>
                         </div>
-                        <div v-else v-for="(expr, id) in functions" 
-                             :key="id" 
-                             class="function-item">
-                            <span>y = {{ expr }}</span>
-                            <button @click="deleteFunction(id)">删除</button>
+                        
+                        <div class="shape-list">
+                            <h3>已添加的图形</h3>
+                            <div v-if="Object.keys(shapes).length === 0">
+                                暂无图形
+                            </div>
+                            <div v-else v-for="(expr, id) in shapes" 
+                                 :key="id" 
+                                 class="shape-item">
+                                <span>{{ expr }}</span>
+                                <button @click="deleteShape(id)">删除</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -227,7 +281,10 @@
             setup() {
                 const newFunction = ref('');
                 const functions = ref({});
-                const error = ref('');
+                const functionError = ref('');
+                const newShape = ref('');
+                const shapes = ref({});
+                const shapeError = ref('');
                 const canvas = ref(null);
                 const isPanelCollapsed = ref(false);
                 const ctx = ref(null);
@@ -355,41 +412,70 @@
                     if (!ctx.value || !canvas.value) return [];
 
                     try {
-                        // 获取可视区域的数学坐标范围
                         const container = canvas.value.parentElement;
                         const width = container.clientWidth;
                         const startX = toMathX(0);
                         const endX = toMathX(width);
-                        const count = width * 100;
+                        const count = width * width * width * width * 4000;
                         
-                        // 从后端获取点集
                         const response = await fetch(`http://localhost:8080/api/functions/${id}/points?start=${startX}&end=${endX}&count=${width}`);
                         if (!response.ok) {
                             throw new Error('Failed to fetch points');
                         }
                         const points = await response.json();
 
-                        // 绘制函数
                         ctx.value.strokeStyle = color;
                         ctx.value.lineWidth = 2;
-                        ctx.value.beginPath();
-
+                        
                         const screenPoints = [];
+                        let isDrawing = false;
+                        let lastValidY = null;
+                        
+                        // 定义一个合理的阈值，可以根据实际情况调整
+                        const discontinuityThreshold = scale.value * 60;
                         
                         points.forEach(([x, y], index) => {
                             const screenX = toScreenX(x);
                             const screenY = toScreenY(y);
                             
-                            screenPoints.push({ x: screenX, y: screenY, mathX: x, mathY: y });
+                            // 检查是否为有效点
+                            const isValidPoint = !isNaN(y) && isFinite(y);
                             
-                            if (index === 0) {
-                                ctx.value.moveTo(screenX, screenY);
+                            if (isValidPoint) {
+                                screenPoints.push({ x: screenX, y: screenY, mathX: x, mathY: y });
+                                
+                                // 检查是否需要开始新的路径
+                                const startNewPath = !isDrawing || 
+                                    (lastValidY !== null && 
+                                    Math.abs(screenY - toScreenY(lastValidY)) > discontinuityThreshold);
+                                
+                                if (startNewPath) {
+                                    if (isDrawing) {
+                                        ctx.value.stroke(); // 结束当前路径
+                                    }
+                                    ctx.value.beginPath();
+                                    ctx.value.moveTo(screenX, screenY);
+                                    isDrawing = true;
+                                } else {
+                                    ctx.value.lineTo(screenX, screenY);
+                                }
+                                
+                                lastValidY = y;
                             } else {
-                                ctx.value.lineTo(screenX, screenY);
+                                // 遇到无效点，结束当前路径
+                                if (isDrawing) {
+                                    ctx.value.stroke();
+                                    isDrawing = false;
+                                }
+                                lastValidY = null;
                             }
                         });
+                        
+                        // 确保最后一段路径被绘制
+                        if (isDrawing) {
+                            ctx.value.stroke();
+                        }
 
-                        ctx.value.stroke();
                         return screenPoints;
                     } catch (err) {
                         console.error('Error drawing function:', err);
@@ -402,13 +488,25 @@
                     const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
                     functionPoints.value = {};
                     
-                    // 使用 Promise.all 并行获取所有函数的点集
+                    // 绘制函数
                     await Promise.all(
                         Object.entries(functions.value).map(async ([id, expr], index) => {
                             const points = await drawFunction(id, expr, colors[index % colors.length]);
                             functionPoints.value[id] = {
                                 points,
                                 color: colors[index % colors.length],
+                                expr
+                            };
+                        })
+                    );
+                    
+                    // 绘制图形
+                    await Promise.all(
+                        Object.entries(shapes.value).map(async ([id, expr], index) => {
+                            const points = await drawShape(id, expr, colors[(index + Object.keys(functions.value).length) % colors.length]);
+                            functionPoints.value[`shape_${id}`] = {
+                                points,
+                                color: colors[(index + Object.keys(functions.value).length) % colors.length],
                                 expr
                             };
                         })
@@ -500,6 +598,114 @@
                         ctx.value = canvas.value.getContext('2d');
                         resizeCanvas();
                         fetchFunctions();
+                        fetchShapes();
+                        if (canvas.value.parentElement) {
+                            resizeObserver.observe(canvas.value.parentElement);
+                        }
+                    }
+                });
+
+                const fetchShapes = async () => {
+                    try {
+                        const response = await fetch('http://localhost:8080/api/shapes');
+                        const data = await response.json();
+                        shapes.value = data;
+                        redraw();
+                    } catch (err) {
+                        console.error('Error fetching shapes:', err);
+                        shapeError.value = '获取图形列表失败，但不影响使用';
+                    }
+                };
+
+                const addShape = async () => {
+                    if (!newShape.value.trim()) {
+                        shapeError.value = '请输入图形表达式';
+                        return;
+                    }
+
+                    try {
+                        await fetch('http://localhost:8080/api/shapes', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                expression: newShape.value
+                            })
+                        });
+
+                        newShape.value = '';
+                        shapeError.value = '';
+                        await fetchShapes();
+                    } catch (err) {
+                        console.error('Error adding shape:', err);
+                        shapeError.value = '添加图形失败';
+                    }
+                };
+
+                const deleteShape = async (id) => {
+                    try {
+                        await fetch(`http://localhost:8080/api/shapes/${id}`, {
+                            method: 'DELETE'
+                        });
+                        await fetchShapes();
+                    } catch (err) {
+                        console.error('Error deleting shape:', err);
+                        shapeError.value = '删除图形失败';
+                    }
+                };
+
+                // 新增绘制图形的方法
+                const drawShape = async (id, expr, color) => {
+                    if (!ctx.value || !canvas.value) return [];
+
+                    try {
+                        const container = canvas.value.parentElement;
+                        const width = container.clientWidth;
+                        const startX = toMathX(0);
+                        const endX = toMathX(width);
+                        
+                        // 从后端获取图形的点集
+                        const response = await fetch(`http://localhost:8080/api/shapes/${id}/points?start=${startX}&end=${endX}&count=${width}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch shape points');
+                        }
+                        const points = await response.json();
+
+                        // 绘制图形
+                        ctx.value.strokeStyle = color;
+                        ctx.value.lineWidth = 2;
+                        ctx.value.beginPath();
+
+                        const screenPoints = [];
+                        
+                        points.forEach(([x, y], index) => {
+                            const screenX = toScreenX(x);
+                            const screenY = toScreenY(y);
+                            
+                            screenPoints.push({ x: screenX, y: screenY, mathX: x, mathY: y });
+                            
+                            if (index === 0) {
+                                ctx.value.moveTo(screenX, screenY);
+                            } else {
+                                ctx.value.lineTo(screenX, screenY);
+                            }
+                        });
+
+                        ctx.value.stroke();
+                        return screenPoints;
+                    } catch (err) {
+                        console.error('Error drawing shape:', err);
+                        return [];
+                    }
+                };
+
+                onMounted(() => {
+                    if (canvas.value) {
+                        ctx.value = canvas.value.getContext('2d');
+                        resizeCanvas();
+                        fetchFunctions();
+                        fetchShapes();  // 新增：获取图形列表
                         if (canvas.value.parentElement) {
                             resizeObserver.observe(canvas.value.parentElement);
                         }
@@ -568,7 +774,12 @@
                 return {
                     newFunction,
                     functions,
-                    error,
+                    functionError,
+                    newShape,
+                    shapes,
+                    shapeError,
+                    addShape,
+                    deleteShape,
                     canvas,
                     isPanelCollapsed,
                     togglePanel,
