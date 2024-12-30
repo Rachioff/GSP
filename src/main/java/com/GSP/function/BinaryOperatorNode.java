@@ -24,12 +24,12 @@ public class BinaryOperatorNode extends ExpressionNode {
             case "*" -> leftVal * rightVal;
             case "/" -> {
                 if (Math.abs(rightVal) < 1e-10) {
-                    throw new ArithmeticException("Division by Zero");
+                    throw new ArithmeticException("除数不能为零");
                 }
                 yield leftVal / rightVal;
             }
             case "^" -> Math.pow(leftVal, rightVal);
-            default -> throw new UnsupportedOperationException("Unknown operator: " + operator);
+            default -> throw new UnsupportedOperationException("未知的运算符: " + operator);
         };
     }
 

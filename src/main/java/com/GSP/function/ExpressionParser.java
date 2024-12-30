@@ -12,7 +12,7 @@ public class ExpressionParser {
     public ExpressionNode parse() {
         ExpressionNode node = parseAddSubtract();
         if (position < expression.length()) {
-            throw new IllegalArgumentException("Unexpected character at position " + position);
+            throw new IllegalArgumentException("在位置 " + position + " 发现非法字符: " + expression.charAt(position));
         }
         return node;
     }
@@ -103,7 +103,7 @@ public class ExpressionParser {
     
     private ExpressionNode parsePrimary() {
         if (position >= expression.length()) {
-            throw new IllegalArgumentException("Unexpected end of expression");
+            throw new IllegalArgumentException("表达式结尾错误");
         }
         
         char c = expression.charAt(position);
@@ -137,7 +137,7 @@ public class ExpressionParser {
             position++;
             ExpressionNode node = parseAddSubtract();
             if (position >= expression.length() || expression.charAt(position) != ')') {
-                throw new IllegalArgumentException("Missing closing parenthesis");
+                throw new IllegalArgumentException("缺少右括号");
             }
             position++;
             return node;
@@ -167,7 +167,7 @@ public class ExpressionParser {
                             return new FunctionNode("log", arg, Integer.parseInt(baseStr.toString()));
                         }
                     }
-                    throw new IllegalArgumentException("Invalid log function format");
+                    throw new IllegalArgumentException("函数格式错误: " + funcName);
                 } else {
                     // 处理其他函数
                     ExpressionNode arg = parseAddSubtract();
@@ -180,6 +180,6 @@ public class ExpressionParser {
             }
         }
         
-        throw new IllegalArgumentException("Unexpected character at position " + position + ": " + c);
+        throw new IllegalArgumentException("在位置 " + position + " 发现非法字符: " + c);
     }
 }

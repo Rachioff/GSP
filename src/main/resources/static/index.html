@@ -6,43 +6,77 @@
     <title>函数绘图器</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.min.js"></script>
     <style>
+        /* 全局样式 */
         body {
             margin: 0;
             padding: 0;
             height: 100vh;
             overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
         }
+        
         #app {
             height: 100vh;
         }
+        
+        /* 容器布局 */
         .container {
             display: flex;
             height: 100%;
             position: relative;
+            background-color: #f5f7fa;
         }
+        
+        /* 控制面板样式 */
         .panel-wrapper {
-            width: 300px;
-            transition: width 0.3s ease;
+            min-width: 200px;
+            max-width: 600px;
+            position: relative;
+            transition: none;  /* 移除过渡效果使拖动更流畅 */
             flex-shrink: 0;
             background: white;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-            position: relative;
+            box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
             z-index: 2;
         }
+        
         .panel-wrapper.collapsed {
-            width: 30px;
+            width: 30px !important; 
+            min-width: 30px !important;
         }
+        
         .control-panel {
-            width: 300px;
+            width: 100%;
             height: 100%;
-            padding: 20px;
+            padding: 24px;
             box-sizing: border-box;
             transform: translateX(0);
-            transition: transform 0.3s ease;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #888 #f1f1f1;
         }
+        
+        .control-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .control-panel::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .control-panel::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
         .control-panel.collapsed {
-            transform: translateX(-270px);
+            transform: translateX(-100%);
         }
+        
+        /* 切换按钮样式 */
         .toggle-button {
             position: absolute;
             right: -30px;
@@ -50,15 +84,21 @@
             width: 30px;
             height: 60px;
             background: white;
-            border: 1px solid #ddd;
-            border-left: none;
+            border: none;
             border-radius: 0 8px 8px 0;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+            box-shadow: 4px 0 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            z-index: 1000;
         }
+        
+        .toggle-button:hover {
+            background: #f8f9fa;
+        }
+        
         .toggle-icon {
             border: solid #666;
             border-width: 0 2px 2px 0;
@@ -66,69 +106,150 @@
             padding: 4px;
             transition: transform 0.3s;
         }
+        
         .collapsed .toggle-icon {
             transform: rotate(-45deg);
         }
+        
         .expanded .toggle-icon {
             transform: rotate(135deg);
         }
+        
+        /* 画布容器样式 */
         .canvas-container {
             flex: 1;
             position: relative;
             height: 100%;
             background: white;
+            border-radius: 0 0 0 20px;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            min-width: 0;
+            width: 100%;
         }
+        
         canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
         }
+        
+        /* 坐标提示框样式 */
         .coordinate-tooltip {
             position: fixed;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(33, 37, 41, 0.95);
             color: white;
-            padding: 8px;
-            border-radius: 4px;
+            padding: 10px 15px;
+            border-radius: 6px;
             font-size: 14px;
             pointer-events: none;
             z-index: 1000;
-            white-space: nowrap;
+            white-space: pre-line;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(4px);
         }
-        .function-list {
+        
+        /* 函数列表样式 */
+        .function-list, .shape-list {
             margin-top: 20px;
-            border: 1px solid #eee;
-            padding: 10px;
-            max-height: calc(100vh - 200px);
-            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
-        .function-item {
+        
+        .function-item, .shape-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px;
-            margin: 5px 0;
-            background-color: #f5f5f5;
-            border-radius: 4px;
+            padding: 12px;
+            margin: 8px 0;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            transition: all 0.2s ease;
         }
+
+        .function-item button.delete-button {
+            background: #dc3545;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .function-item button.delete-button:hover {
+            background: #c82333;
+        }
+
+        /* 添加求导按钮的专门样式 */
+        .function-item button.derive-button {
+            background: #2196F3;  /* 蓝色 */
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .function-item button.derive-button:hover {
+            background: #1976D2;  /* 深蓝色 */
+        }
+        
+        .function-item:hover, .shape-item:hover {
+            background-color: #e9ecef;
+            transform: translateY(-1px);
+        }
+        
+        /* 输入框样式 */
         .input-container {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+            display: flex;  /* 使用flex布局 */
+            flex-wrap: wrap;  /* 允许在空间不足时换行 */
+            gap: 8px;  /* 设置元素之间的间距 */
+            width: 100%;  /* 确保容器占满可用宽度 */
         }
+        
         .input-container input {
-            width: 200px;
-            padding: 5px;
-            margin-right: 10px;
+            width: calc(100% - 80px);  /* 减去添加按钮的宽度和一些间距 */
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            margin-bottom: 8px;
+            margin-right: 8px;
+            box-sizing: border-box;  /* 确保padding和border包含在宽度内 */
         }
+
+        .input-container button {
+            flex-shrink: 0;  /* 防止按钮被压缩 */
+            white-space: nowrap;  /* 防止按钮文字换行 */
+        }
+        
+        .input-container input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+        
+        /* 按钮样式 */
         button {
             background: #4CAF50;
             color: white;
             border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
+            padding: 8px 16px;
+            border-radius: 6px;
             cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 0.5px;
         }
+        
         button:hover {
             background: #45a049;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
         }
+        
+        /* 缩放控制按钮 */
         .zoom-controls {
             position: absolute;
             top: 20px;
@@ -137,67 +258,137 @@
             gap: 10px;
             z-index: 1;
         }
+        
         .zoom-button {
-            width: 36px;
-            height: 36px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
+            width: 40px;
+            height: 40px;
+            background: white;
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 20px;
             font-weight: bold;
-            transition: background-color 0.2s;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
+        
         .zoom-button:hover {
-            background: #45a049;
+            background: #4CAF50;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
         }
-        .function-item button {
-            background: #ff4444;
+        
+        /* 删除按钮样式 */
+        .function-item button, .shape-item button {
+            background: #dc3545;
+            padding: 6px 12px;
+            font-size: 12px;
         }
-        .function-item button:hover {
-            background: #cc0000;
+        
+        .function-item button:hover, .shape-item button:hover {
+            background: #c82333;
         }
+        
+        /* 标题样式 */
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 24px;
+            font-weight: 600;
+            font-size: 24px;
+        }
+        
+        h3 {
+            color: #495057;
+            font-size: 16px;
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+        
+        /* 分区样式 */
         .input-section {
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f1f3f5;
         }
+        
         .section-title {
-            font-size: 1.1em;
-            margin-bottom: 10px;
-            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-weight: 500;
         }
-        .shape-list {
-            margin-top: 20px;
-            border: 1px solid #eee;
-            padding: 10px;
-            max-height: calc(50vh - 200px);
-            overflow-y: auto;
-        }
-        .shape-item {
+
+        .button-group {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px;
-            margin: 5px 0;
-            background-color: #f0f7ff;
-            border-radius: 4px;
+            gap: 8px;  /* 按钮之间的间距 */
         }
+
+        .derive-button {
+            background: #2196F3;  /* 蓝色系 */
+        }
+
+        .derive-button:hover {
+            background: #1976D2;  /* 深蓝色 */
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+        }
+
+        .panel-wrapper {
+            /* 修改原有样式，移除固定宽度 */
+            transition: none;  /* 移除宽度的过渡效果，让拖动更流畅 */
+            min-width: 200px;  /* 设置最小宽度 */
+            max-width: 600px;  /* 设置最大宽度 */
+            position: relative;
+        }
+
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: -5px;
+            width: 10px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 100;
+        }
+
+        /* 当拖动时添加一个遮罩层防止其他元素干扰 */
+        .resize-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            cursor: col-resize;
+        }
+        
+        /* 错误提示样式 */
         .error {
-            color: red;
-            margin-top: 5px;
-            font-size: 0.9em;
+            color: #dc3545;
+            margin-top: 6px;
+            font-size: 13px;
+            padding: 4px 8px;
+            background-color: rgba(220, 53, 69, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid #dc3545;
         }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="container">
-            <div class="panel-wrapper" :class="{ collapsed: isPanelCollapsed }">
+            <div class="panel-wrapper" 
+            :class="{ collapsed: isPanelCollapsed }"
+            :style="{ width: isPanelCollapsed ? '30px' : panelWidth + 'px' }">
+                <div class="resizer" 
+                    @mousedown="startResize"
+                    @mouseover="showResizeCursor"
+                    @mouseleave="hideResizeCursor"></div>
                 <div class="control-panel" :class="{ collapsed: isPanelCollapsed }">
                     <div class="toggle-button" 
                          @click="togglePanel"
@@ -205,6 +396,9 @@
                         <span class="toggle-icon"></span>
                     </div>
                     <h2>GSP几何画板</h2>
+                    <!-- 查看README按钮点击事件绑定的showReadme方法修改如下 -->
+                    <button @click="showReadme">查看README</button>
+
                     <div class="input-section">
                         <div class="section-title">函数绘制</div>
                         <div class="input-container">
@@ -220,11 +414,12 @@
                             <div v-if="Object.keys(functions).length === 0">
                                 暂无函数
                             </div>
-                            <div v-else v-for="(expr, id) in functions" 
-                                 :key="id" 
-                                 class="function-item">
-                                <span>y = {{ expr }}</span>
-                                <button @click="deleteFunction(id)">删除</button>
+                            <div v-else v-for="(funcData, id) in functions" :key="id" class="function-item">
+                                <span :style="{ color: funcData.color }">y = {{ funcData.expr }}</span>
+                                <div class="button-group">
+                                    <button class="derive-button" @click="deriveFunction(id)">求导</button>
+                                    <button class="delete-button" @click="deleteFunction(id)">删除</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -290,9 +485,283 @@
                 const ctx = ref(null);
                 const scale = ref(40); // 每个单位对应的像素数
                 const functionPoints = ref({});
+                
+                const panelWidth = ref(290);  // 初始宽度
+                const isResizing = ref(false);
+                let startX = 0;
+                let startWidth = 0;
+
                 let centerX = 0;
                 let centerY = 0;
                 let resizeTimeout = null;
+                const FUNCTION_COLORS = Object.freeze([
+                    '#36A2EB', 
+                    '#FF6384', 
+                    '#FFCE56', 
+                    '#4BC0C0', 
+                    '#9966FF', 
+                    '#FF9F40'
+                ]);
+                
+                const startResize = (event) => {
+                    isResizing.value = true;
+                    startX = event.clientX;
+                    startWidth = panelWidth.value;
+                    
+                    // 添加全局事件监听
+                    document.addEventListener('mousemove', handleResize);
+                    document.addEventListener('mouseup', stopResize);
+                    
+                    // 添加遮罩层
+                    const overlay = document.createElement('div');
+                    overlay.className = 'resize-overlay';
+                    document.body.appendChild(overlay);
+                };
+
+                // 处理拖动
+                const handleResize = (event) => {
+                    if (!isResizing.value) return;
+    
+                    const diff = event.clientX - startX;
+                    const newWidth = Math.max(200, Math.min(600, startWidth + diff));
+                    panelWidth.value = newWidth;
+                    
+                    // 添加防抖处理
+                    if (resizeTimeout) {
+                        clearTimeout(resizeTimeout);
+                    }
+                    resizeTimeout = setTimeout(() => {
+                        redraw();
+                    }, 16);  // 大约60fps的刷新率
+
+                    requestAnimationFrame(() => {
+                        resizeCanvas();
+                    });
+                };
+
+                // 停止拖动
+                const stopResize = () => {
+                    isResizing.value = false;
+                    
+                    // 移除全局事件监听
+                    document.removeEventListener('mousemove', handleResize);
+                    document.removeEventListener('mouseup', stopResize);
+                    
+                    // 移除遮罩层
+                    const overlay = document.querySelector('.resize-overlay');
+                    if (overlay) {
+                        overlay.remove();
+                    }
+                };
+
+                // 鼠标悬停在拖动条上时显示调整光标
+                const showResizeCursor = () => {
+                    document.body.style.cursor = 'col-resize';
+                };
+
+                // 鼠标离开拖动条时恢复默认光标
+                const hideResizeCursor = () => {
+                    if (!isResizing.value) {
+                        document.body.style.cursor = 'default';
+                    }
+                };
+
+
+                const updateFunctionsWithColors = async () => {
+                    try {
+                        const response = await fetch('http://localhost:8080/api/functions');
+                        const data = await response.json();
+                        const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+                        const updatedFunctions = {};
+                        for (let [id, expr] of Object.entries(data)) {
+                            const pointsAndColor = await drawFunction(id, expr, colors[id % colors.length]);
+                            updatedFunctions[id] = {
+                                expr: expr,
+                                color: pointsAndColor.color
+                            };
+                        }
+                        functions.value = updatedFunctions;
+                    } catch (err) {
+                        console.error('Error fetching functions with colors:', err);
+                    }
+                };
+                
+                const isValidFunctionExpression = (expr) => {
+                    // 处理可能存在的空格，将表达式中的连续空格替换为单个空格，方便后续校验
+                    const processedExpr = expr.replace(/\s+/g,''); 
+
+                    // 检查是否包含非法字符（除了允许的运算符、函数名、数字、括号、x等）
+                    const hasIllegalChars = /[^\d+\-*/^,().xsin|cos|tan|log|exp|sqrt]/.test(processedExpr);
+                    if (hasIllegalChars) {
+                        return false;
+                    }
+
+                    // 检查是否存在省略运算符的情况，例如 2x 这种不符合要求的写法（通过查找数字后紧跟字母的情况判断）
+                    const hasOmittedOperator = /\d[a-zA-Z]/.test(processedExpr);
+                    if (hasOmittedOperator) {
+                        return false;
+                    }
+
+                    // 检查对数函数格式是否正确，要求类似log(2, x)这种形式
+                    const logFunctionRegex = /log\((\d+),\s*x\)/g;
+                    let match;
+                    while ((match = logFunctionRegex.exec(processedExpr))!== null) {
+                        const base = match[1];
+                        if (isNaN(base) || parseInt(base) <= 0) {
+                            return false;
+                        }
+                    }
+
+                    // 检查单独出现函数名中的字符或单独出现函数名但无后续合理内容的情况视为非法，如单独的's'、'i'、'n'、'cos'、'sin'等情况判定为不合法
+                    const functionNames = ['sin', 'cos', 'tan', 'log', 'exp','sqrt'];
+                    let i = 0;
+                    while (i < processedExpr.length) {
+                        let j;
+                        for (const funcName of functionNames) {
+                            if (processedExpr[i] === funcName[0]) {
+                                // 尝试匹配整个函数名
+                                for (j = 1; j < funcName.length; j++) {
+                                    if (processedExpr[i + j]!== funcName[j]) {
+                                        break;
+                                    }
+                                }
+                                if (j === funcName.length) {
+                                    // 完整匹配到函数名后，检查后面是否跟着合法内容（比如括号等）
+                                    const isValidAfterFunctionName = isValidAfterFunction(funcName, processedExpr, i + funcName.length);
+                                    if (!isValidAfterFunctionName) {
+                                        return false;
+                                    }
+                                    i += funcName.length;
+                                } else {
+                                    // 没有完整匹配到函数名，说明单独出现了函数名中的字符，视为非法
+                                    return false;
+                                }
+                            }
+                        }
+                        i++;
+                    }
+
+                    // 检查连续多个相同字母的情况（如 xx、xxx等不符合要求），这里只考虑单个x作为自变量的情况
+                    const repeatedXRegex = /x{2,}/;
+                    if (repeatedXRegex.test(processedExpr)) {
+                        return false;
+                    }
+
+                    // 以下是更细致地检查函数组合、嵌套等是否符合语法规则，通过栈的思想来检查括号匹配情况
+                    const stack = [];
+                    for (let i = 0; i < processedExpr.length; i++) {
+                        const char = processedExpr.charAt(i);
+                        if (char === '(') {
+                            stack.push(char);
+                        } else if (char === ')') {
+                            if (stack.length == 0) {
+                                return false; // 括号不匹配，右括号多余
+                            }
+                            stack.pop();
+                        }
+                    }
+                    if (stack.length > 0) {
+                        return false; // 括号不匹配，左括号多余
+                    }
+
+                    // 新增：检查指数函数格式是否正确，要求底数不能为0、1等不符合要求的值（例如0^x、1^x这种简单情况不符合数学意义上作为函数的一般性要求）
+                    const expFunctionRegex = /(\d+)\^x/g;
+                    while ((match = expFunctionRegex.exec(processedExpr))!== null) {
+                        const base = match[1];
+                        if (parseInt(base) === 0 || parseInt(base) === 1) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                };
+
+                // 新增函数用于检查函数名后是否跟着合法内容，进一步细化括号内不能无内容的检查
+                function isValidAfterFunction(funcName, expr, startIndex) {
+                    // 如果函数名后直接是表达式结尾，视为非法，函数应该有参数等后续合法内容
+                    if (startIndex === expr.length) {
+                        return false;
+                    }
+                    // 对于不同函数，可根据其参数格式要求进一步检查后续内容合法性
+                    switch (funcName) {
+                        case 'sin':
+                        case 'cos':
+                        case 'tan':
+                            // 三角函数后面应该紧跟括号及合法内容，简单判断下一位是否为括号，且括号内要有内容
+                            return expr[startIndex] === '(' && hasContentInParentheses(expr, startIndex);
+                        case 'log':
+                            // log函数后面应该跟着类似 (base, x) 的格式，简单判断是否以 ( 开头且括号内要有合法内容（数字、逗号、x等）以及后面跟着合理内容
+                            return expr.startsWith('(', startIndex) && hasValidLogContent(expr.substr(startIndex)) && /\(\d+,\s*x\)/.test(expr.substr(startIndex));
+                        case 'exp':
+                            // exp函数后可直接跟合法内容，这里简单判断不是表达式结尾就行（后续可根据更严格要求扩展）
+                            return startIndex < expr.length;
+                        case 'sqrt':
+                            // sqrt函数后面应该紧跟括号及合法内容，简单判断下一位是否为括号，且括号内要有内容
+                            return expr[startIndex] === '(' && hasContentInParentheses(expr, startIndex);
+                        default:
+                            return true;  // 其他未考虑到的函数情况暂时返回合法（可根据实际情况完善）
+                    }
+                }
+
+                // 新增函数用于检查括号内是否有内容
+                function hasContentInParentheses(expr, openIndex) {
+                    let depth = 1;
+                    for (let i = openIndex + 1; i < expr.length; i++) {
+                        if (expr[i] === '(') {
+                            depth++;
+                        } else if (expr[i] === ')') {
+                            depth--;
+                            if (depth === 0) {
+                                return i > openIndex + 1; // 如果括号闭合且中间有内容（不仅仅是一对空括号）则返回true
+                            }
+                        }
+                    }
+                    return false; // 如果没有正常闭合括号则返回false
+                }
+
+                // 新增函数用于检查log函数括号内内容格式是否更准确合法（目前简单示例，可完善）
+                function hasValidLogContent(logPart) {
+                    const logContentRegex = /^\(\d+,\s*x\)/;
+                    return logContentRegex.test(logPart);
+                }
+                const isValidShapeExpression = (expr) => {
+                    // 处理可能存在的空格，将表达式中的连续空格替换为单个空格，方便后续校验
+                    const processedExpr = expr.replace(/\s+/g,''); 
+                    
+                    // 先简单判断是否包含椭圆或双曲线的基本特征符号（括号、平方、除号、等号等）
+                    if (!/[\(\)\^\/=]/.test(processedExpr)) {
+                        return false;
+                    }
+                    
+                    // 检查是否符合椭圆或双曲线的基本格式，提取关键部分进行检查
+                    const parts = processedExpr.split('=');
+                    if (parts.length!== 2 || parts[1]!== '1') {
+                        return false; // 不符合等式右边为1的格式要求
+                    }
+                    
+                    const leftSide = parts[0];
+                    const xPart = /\((.*?)\)\^2\/(\d+)\^2/.exec(leftSide);
+                    const yPart = /(\+|\-)\((.*?)\)\^2\/(\d+)\^2/.exec(leftSide);
+                    if (!xPart ||!yPart) {
+                        return false; // 无法正确提取x和y相关部分，格式不对
+                    }
+                    
+                    const a = parseInt(xPart[2]);
+                    const b = parseInt(yPart[3]);
+                    if (a === 0 || b === 0) {
+                        return false; // a或b为0，不符合要求
+                    }
+                    
+                    return true;
+                };
+
+                const showReadme = () => {
+                    const readmeText = `1.欢迎使用GSP几何画板工具，本工具主要用于给出陌生函数或者难以想象的函数图像的大致图像，其中由于精度问题可能会和实际有些许差别，具体见下文。
+2.首先介绍函数图像部分的用法。本工具支持幂函数(x^a)、指数函数(a^x)、指数函数(log(2, x))、三角函数(sin,cos,tan)及其复合、组合等函数。需要注意的是，本工具解析器较为严格，在输入表达式的时候无需输入"y="，自变量只能为x，请不要省略运算符，例如2*x不要简写成2x。请在输入函数表达式之前尽量化简表达式，从而减小内存占用。这里给出一个函数示例-x^2+cos(sin(x))-ln(x)+log(2, x)。
+3.其次对于图形绘制。本工具支持椭圆 ( (x+h)^2/a^2+(y+k)^2/b^2=1) 和 双曲线 ( (x+h)^2/a^2 - (y+k)^2/b^2=1) 的绘制。需要注意的是，本工具解析器较为严格，在输入表达式时务必要加括号，即x和y两边的括号，例如h=k=0的情况，应该写成 (x-0)^2/a^2+(y-0)^2/b^2=1，不要省略括号和加减符号，若h或者k=0，则0也不可以忽略。请注意，a和b不要为0。这里给出一个椭圆的表达式示例：(x+2)^2/2^2+(y-3)^2/4^2=1, 双曲线的表达式示例： (x+2)^2/2^2-(y+3)^2/5^2=1。
+4.由于本工具的绘图原理是点枚举，所以会产生精度问题。例如对于某区间内不一致连续的函数，由于斜率变化过快，从而导致点的采样精度不足以很好刻画函数图像。同时为了消除一些无穷间断点的图像问题，前端对于大斜率做出了一些妥协，从而可能对于一些斜率增长率即二阶导函数过大的函数可能产生截断。但是对于已经绘制出的点，由于是后端直接计算得到，其值是绝对准确的，可以通过鼠标悬浮的方法来查看的坐标。`;
+                    alert(readmeText);
+                };
 
                 // 新增缩放功能
                 const zoomIn = async () => {
@@ -409,14 +878,14 @@
 
                 // 绘制函数
                 const drawFunction = async (id, expr, color) => {
-                    if (!ctx.value || !canvas.value) return [];
+                    if (!ctx.value ||!canvas.value) return [];
 
                     try {
                         const container = canvas.value.parentElement;
                         const width = container.clientWidth;
                         const startX = toMathX(0);
                         const endX = toMathX(width);
-                        const count = width * width * width * width * 4000;
+                        const count = width * 100;
                         
                         const response = await fetch(`http://localhost:8080/api/functions/${id}/points?start=${startX}&end=${endX}&count=${width}`);
                         if (!response.ok) {
@@ -432,21 +901,26 @@
                         let lastValidY = null;
                         
                         // 定义一个合理的阈值，可以根据实际情况调整
-                        const discontinuityThreshold = scale.value * 60;
+                        const discontinuityThreshold = scale.value * 100; // 1个单位的跨度
                         
                         points.forEach(([x, y], index) => {
                             const screenX = toScreenX(x);
                             const screenY = toScreenY(y);
+                            // 新增：检查坐标是否为合理的数值（避免出现不符合数学逻辑的异常值，虽然前面已经验证表达式合法，但以防万一服务器返回异常等情况）
+                            if (isNaN(screenX) || isNaN(screenY) ||!isFinite(screenX) ||!isFinite(screenY)) {
+                                console.error('Invalid coordinate value in drawFunction:', { screenX, screenY });
+                                return;
+                            }
                             
                             // 检查是否为有效点
-                            const isValidPoint = !isNaN(y) && isFinite(y);
+                            const isValidPoint =!isNaN(y) && isFinite(y);
                             
                             if (isValidPoint) {
                                 screenPoints.push({ x: screenX, y: screenY, mathX: x, mathY: y });
                                 
                                 // 检查是否需要开始新的路径
-                                const startNewPath = !isDrawing || 
-                                    (lastValidY !== null && 
+                                const startNewPath =!isDrawing || 
+                                    (lastValidY!== null && 
                                     Math.abs(screenY - toScreenY(lastValidY)) > discontinuityThreshold);
                                 
                                 if (startNewPath) {
@@ -476,7 +950,11 @@
                             ctx.value.stroke();
                         }
 
-                        return screenPoints;
+                        return {
+                            points: screenPoints,
+                            color: color,
+                            expr: expr
+                        };
                     } catch (err) {
                         console.error('Error drawing function:', err);
                         return [];
@@ -485,28 +963,32 @@
 
                 const redraw = async () => {
                     drawGrid();
-                    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
-                    functionPoints.value = {};
                     
-                    // 绘制函数
+                    functionPoints.value = {};
+    
                     await Promise.all(
-                        Object.entries(functions.value).map(async ([id, expr], index) => {
-                            const points = await drawFunction(id, expr, colors[index % colors.length]);
+                        Object.entries(functions.value).map(async ([id, funcData], index) => {
+                            const points = await drawFunction(
+                                id, 
+                                funcData.expr, 
+                                funcData.color
+                            );
                             functionPoints.value[id] = {
                                 points,
-                                color: colors[index % colors.length],
-                                expr
+                                color: funcData.color,
+                                expr: funcData.expr
                             };
                         })
                     );
                     
                     // 绘制图形
+                    // 在 redraw 函数中修改为：
                     await Promise.all(
                         Object.entries(shapes.value).map(async ([id, expr], index) => {
-                            const points = await drawShape(id, expr, colors[(index + Object.keys(functions.value).length) % colors.length]);
+                            const points = await drawShape(id, expr, FUNCTION_COLORS[(index + Object.keys(functions.value).length) % FUNCTION_COLORS.length]);
                             functionPoints.value[`shape_${id}`] = {
                                 points,
-                                color: colors[(index + Object.keys(functions.value).length) % colors.length],
+                                color: FUNCTION_COLORS[(index + Object.keys(functions.value).length) % FUNCTION_COLORS.length],
                                 expr
                             };
                         })
@@ -541,55 +1023,169 @@
                 const togglePanel = () => {
                     isPanelCollapsed.value = !isPanelCollapsed.value;
                     // 等待过渡动画完成后重新调整画布
-                    setTimeout(resizeCanvas, 300);
+                    setTimeout(() => {
+                        if (isPanelCollapsed.value) {
+                            panelWidth.value = 30;
+                        } else {
+                            panelWidth.value = 290;
+                        }
+                        resizeCanvas();
+                    }, 300);
                 };
 
                 const fetchFunctions = async () => {
                     try {
                         const response = await fetch('http://localhost:8080/api/functions');
                         const data = await response.json();
-                        functions.value = data;
-                        redraw();
+                        
+                        const functionsWithColors = {};
+                        let colorIndex = 0;
+                        Object.entries(data).forEach(([id, expr]) => {
+                            functionsWithColors[id] = {
+                                expr: expr,
+                                color: FUNCTION_COLORS[colorIndex % FUNCTION_COLORS.length]
+                            };
+                            colorIndex++;
+                        });
+                        
+                        functions.value = functionsWithColors;
+                        await redraw();
                     } catch (err) {
                         console.error('Error fetching functions:', err);
-                        error.value = '获取函数列表失败，但不影响使用';
+                        functionError.value = '获取函数列表失败，但不影响使用';
                     }
                 };
-
+                
                 const addFunction = async () => {
-                    if (!newFunction.value.trim()) {
-                        error.value = '请输入函数表达式';
+                    const expr = newFunction.value.trim();
+                    if (!expr) {
+                        alert('请输入函数表达式');
                         return;
                     }
-
+                    
                     try {
-                        await fetch('http://localhost:8080/api/functions', {
+                        const response = await fetch('http://localhost:8080/api/functions', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                expression: newFunction.value
+                                expression: expr
                             })
                         });
+                        
+                        if (!response.ok) {
+                            const error = await response.json();
+                            alert(error.message || '函数添加失败，请检查表达式格式');
+                            return;
+                        }
 
                         newFunction.value = '';
                         await fetchFunctions();
                     } catch (err) {
                         console.error('Error adding function:', err);
-                        error.value = '添加函数失败';
+                        alert('函数添加失败，请稍后重试');
                     }
                 };
 
+                const deriveFunction = async (id) => {
+                    try {
+                        const response = await fetch(`http://localhost:8080/api/functions/${id}/derivative`, {
+                            method: 'POST'
+                        });
+                        
+                        if (!response.ok) {
+                            const error = await response.json();
+                            alert(error.message || '求导失败');
+                            return;
+                        }
+
+                        // 求导成功后刷新函数列表
+                        await fetchFunctions();
+                    } catch (err) {
+                        console.error('Error deriving function:', err);
+                        alert('求导失败，请稍后重试');
+                    }
+                };
+
+                // 新增函数用于获取带有颜色信息的函数列表
+                const getFunctionsWithColors = async () => {
+                    try {
+                        const response = await fetch('http://localhost:8080/api/functions');
+                        const data = await response.json();
+                        const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+                        const updatedFunctions = {};
+                        for (let [id, expr] of Object.entries(data)) {
+                            const pointsAndColor = await drawFunction(id, expr, colors[id % colors.length]);
+                            updatedFunctions[id] = {
+                                expr: expr,
+                                color: pointsAndColor.color
+                            };
+                        }
+                        return updatedFunctions;
+                    } catch (err) {
+                        console.error('Error fetching functions with colors:', err);
+                        return {};
+                    }
+                };
+
+                const clearFunctionImage = async (id) => {
+                    if (!ctx.value ||!canvas.value) return;
+                    await redrawWithoutFunction(id);
+                };
+
+                const redrawWithoutFunction = async (idToExclude) => {
+                    drawGrid();
+                    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+                    functionPoints.value = {};
+
+                    // 绘制函数（排除要删除的那个函数）
+                    await Promise.all(
+                        Object.entries(functions.value).filter(([currentId]) => currentId!== idToExclude).map(async ([id, expr], index) => {
+                            const points = await drawFunction(id, expr, colors[index % colors.length]);
+                            functionPoints.value[id] = {
+                                points,
+                                color: colors[index % colors.length],
+                                expr
+                            };
+                        })
+                    );
+
+                    // 绘制图形
+                    await Promise.all(
+                        Object.entries(shapes.value).map(async ([id, expr], index) => {
+                            const points = await drawShape(id, expr, colors[(index + Object.keys(functions.value).length) % colors.length]);
+                            functionPoints.value[`shape_${id}`] = {
+                                points,
+                                color: colors[(index + Object.keys(functions.value).length) % colors.length],
+                                expr
+                            };
+                        })
+                    );
+                };
                 const deleteFunction = async (id) => {
                     try {
                         await fetch(`http://localhost:8080/api/functions/${id}`, {
                             method: 'DELETE'
                         });
-                        await fetchFunctions();
+                        // 获取更新后的函数列表（已删除指定函数）
+                        const updatedFunctions = await fetch('http://localhost:8080/api/functions');
+                        const functionsData = await updatedFunctions.json();
+                        // 重新分配颜色
+                        const updatedFunctionsWithColors = {};
+                        let colorIndex = 0;
+                        for (const [funcId, expr] of Object.entries(functionsData)) {
+                            updatedFunctionsWithColors[funcId] = {
+                                expr: expr,
+                                color: FUNCTION_COLORS[colorIndex % FUNCTION_COLORS.length]
+                            };
+                            colorIndex++;
+                        }
+                        functions.value = updatedFunctionsWithColors;
+                        await redraw();
                     } catch (err) {
                         console.error('Error deleting function:', err);
-                        error.value = '删除函数失败';
+                        functionError.value = '删除函数失败';
                     }
                 };
 
@@ -599,8 +1195,17 @@
                         resizeCanvas();
                         fetchFunctions();
                         fetchShapes();
-                        if (canvas.value.parentElement) {
-                            resizeObserver.observe(canvas.value.parentElement);
+                        
+                        // 监听画布容器的大小变化
+                        const canvasContainer = canvas.value.parentElement;
+                        if (canvasContainer) {
+                            const resizeObserver = new ResizeObserver((entries) => {
+                                // 立即调整画布大小
+                                requestAnimationFrame(() => {
+                                    resizeCanvas();
+                                });
+                            });
+                            resizeObserver.observe(canvasContainer);
                         }
                     }
                 });
@@ -618,11 +1223,15 @@
                 };
 
                 const addShape = async () => {
-                    if (!newShape.value.trim()) {
-                        shapeError.value = '请输入图形表达式';
+                    const expr = newShape.value.trim();
+                    if (!expr) {
+                        alert('表达式不合法：图形表达式不能为空，请输入符合要求的表达式');
                         return;
                     }
-
+                    if (!isValidShapeExpression(expr)) {
+                        alert('表达式不合法：输入的图形表达式不符合要求，请检查表达式格式');
+                        return;
+                    }
                     try {
                         await fetch('http://localhost:8080/api/shapes', {
                             method: 'POST',
@@ -630,16 +1239,14 @@
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                expression: newShape.value
+                                expression: expr
                             })
                         });
 
                         newShape.value = '';
-                        shapeError.value = '';
                         await fetchShapes();
                     } catch (err) {
-                        console.error('Error adding shape:', err);
-                        shapeError.value = '添加图形失败';
+                        alert('表达式不合法：添加图形失败，请检查表达式是否符合要求');
                     }
                 };
 
@@ -664,36 +1271,82 @@
                         const width = container.clientWidth;
                         const startX = toMathX(0);
                         const endX = toMathX(width);
+                        const count = width;
                         
-                        // 从后端获取图形的点集
-                        const response = await fetch(`http://localhost:8080/api/shapes/${id}/points?start=${startX}&end=${endX}&count=${width}`);
+                        const response = await fetch(`http://localhost:8080/api/shapes/${id}/points?start=${startX}&end=${endX}&count=${count}`);
                         if (!response.ok) {
                             throw new Error('Failed to fetch shape points');
                         }
                         const points = await response.json();
 
-                        // 绘制图形
+                        // 将点集转换为屏幕坐标
+                        const screenPoints = points
+                            .filter(([x, y]) => !isNaN(y) && isFinite(y))
+                            .map(([x, y]) => ({
+                                x: toScreenX(x),
+                                y: toScreenY(y),
+                                mathX: x,
+                                mathY: y
+                            }));
+
+                        if (screenPoints.length === 0) return [];
+
+                        // 找到最近邻点并绘制
                         ctx.value.strokeStyle = color;
                         ctx.value.lineWidth = 2;
-                        ctx.value.beginPath();
-
-                        const screenPoints = [];
                         
-                        points.forEach(([x, y], index) => {
-                            const screenX = toScreenX(x);
-                            const screenY = toScreenY(y);
-                            
-                            screenPoints.push({ x: screenX, y: screenY, mathX: x, mathY: y });
-                            
-                            if (index === 0) {
-                                ctx.value.moveTo(screenX, screenY);
-                            } else {
-                                ctx.value.lineTo(screenX, screenY);
-                            }
-                        });
+                        // 找到一个起始点（可以是最左边的点）
+                        let currentPoint = screenPoints[0];
+                        let remainingPoints = screenPoints.slice(1);
+                        let usedPoints = [currentPoint];
+                        
+                        ctx.value.beginPath();
+                        ctx.value.moveTo(currentPoint.x, currentPoint.y);
 
+                        const maxDistance = 100; // 最大连接距离，可以根据需要调整
+
+                        // 连接最近的点，直到没有合适的点可连接
+                        while (remainingPoints.length > 0) {
+                            // 找到距离当前点最近的点
+                            let minDistance = Infinity;
+                            let nextPointIndex = -1;
+
+                            remainingPoints.forEach((point, index) => {
+                                const distance = Math.sqrt(
+                                    Math.pow(point.x - currentPoint.x, 2) + 
+                                    Math.pow(point.y - currentPoint.y, 2)
+                                );
+                                
+                                if (distance < minDistance && distance < maxDistance) {
+                                    minDistance = distance;
+                                    nextPointIndex = index;
+                                }
+                            });
+
+                            // 如果没有找到合适的下一个点，开始新的路径
+                            if (nextPointIndex === -1) {
+                                ctx.value.stroke();
+                                
+                                if (remainingPoints.length > 0) {
+                                    currentPoint = remainingPoints[0];
+                                    remainingPoints = remainingPoints.slice(1);
+                                    ctx.value.beginPath();
+                                    ctx.value.moveTo(currentPoint.x, currentPoint.y);
+                                    usedPoints.push(currentPoint);
+                                }
+                            } else {
+                                // 连接到下一个点
+                                currentPoint = remainingPoints[nextPointIndex];
+                                remainingPoints.splice(nextPointIndex, 1);
+                                ctx.value.lineTo(currentPoint.x, currentPoint.y);
+                                usedPoints.push(currentPoint);
+                            }
+                        }
+
+                        // 绘制最后一段
                         ctx.value.stroke();
-                        return screenPoints;
+
+                        return usedPoints;
                     } catch (err) {
                         console.error('Error drawing shape:', err);
                         return [];
@@ -722,13 +1375,15 @@
 
                 // 查找最近的点
                 const findClosestPoint = (mouseX, mouseY) => {
-                    const threshold = 5; // 鼠标到曲线的最大距离
+                    const threshold = 5;
                     let closestPoint = null;
                     let minDistance = Infinity;
                     let closestFunction = null;
 
                     Object.entries(functionPoints.value).forEach(([id, func]) => {
-                        func.points.forEach(point => {
+                        if (!func.points || !Array.isArray(func.points.points)) return;
+                        
+                        func.points.points.forEach(point => {
                             const distance = Math.sqrt(
                                 Math.pow(mouseX - point.x, 2) + 
                                 Math.pow(mouseY - point.y, 2)
@@ -736,7 +1391,10 @@
                             if (distance < threshold && distance < minDistance) {
                                 minDistance = distance;
                                 closestPoint = point;
-                                closestFunction = func;
+                                closestFunction = {
+                                    expr: func.expr,
+                                    color: func.points.color
+                                };
                             }
                         });
                     });
@@ -760,7 +1418,9 @@
                             left: `${event.clientX + 10}px`,
                             top: `${event.clientY + 10}px`
                         };
-                        tooltipContent.value = `y = ${func.expr}\n(${point.mathX.toFixed(2)}, ${point.mathY.toFixed(2)})`;
+                        tooltipContent.value = func.expr ? 
+                            `${func.expr}\n(${point.mathX.toFixed(4)}, ${point.mathY.toFixed(4)})` :
+                            `(${point.mathX.toFixed(4)}, ${point.mathY.toFixed(4)})`;
                     } else {
                         showTooltip.value = false;
                     }
@@ -784,6 +1444,7 @@
                     isPanelCollapsed,
                     togglePanel,
                     addFunction,
+                    deriveFunction,
                     deleteFunction,
                     // 鼠标悬停相关
                     showTooltip,
@@ -793,7 +1454,12 @@
                     hideTooltip,
                     // 新增缩放控制
                     zoomIn,
-                    zoomOut
+                    zoomOut,
+                    showReadme,
+                    panelWidth,
+                    startResize,
+                    showResizeCursor,
+                    hideResizeCursor
                 };
             }
         });

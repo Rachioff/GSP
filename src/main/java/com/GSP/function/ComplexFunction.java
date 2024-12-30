@@ -12,7 +12,6 @@ public class ComplexFunction extends Function {
     public ComplexFunction(String expression) {
         this.expression = new MathExpression(expression);
         expressionString = this.expression.toString();
-        System.out.println(expressionString);
     }
 
     @Override

@@ -28,10 +28,10 @@ public class FunctionNode extends ExpressionNode {
             case "tan" -> Math.tan(arg);
             case "ln" -> Math.log(arg);
             case "log" -> {
-                if (base == null) throw new IllegalStateException("Base not specified for log");
+                if (base == null) throw new IllegalStateException("log函数缺少底数");
                 yield Math.log(arg) / Math.log(base);
             }
-            default -> throw new UnsupportedOperationException("Unknown function: " + functionName);
+            default -> throw new UnsupportedOperationException("未知的函数: " + functionName);
         };
     }
 
@@ -60,7 +60,7 @@ public class FunctionNode extends ExpressionNode {
                 new BinaryOperatorNode("*", argument, new FunctionNode("ln", new ConstantNode(base)))),
                 argument.derivative());
 
-            default -> throw new UnsupportedOperationException("Unknown function: " + functionName);
+            default -> throw new UnsupportedOperationException("未知的函数: " + functionName);
         };
     }
 
