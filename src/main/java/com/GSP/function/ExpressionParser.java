@@ -127,6 +127,17 @@ public class ExpressionParser {
         }
         
         // 处理变量
+        if (c == 'p' && position + 1 < expression.length() && expression.charAt(position + 1) == 'i') {
+            position += 2;
+            return new ConstantNode("pi");
+        }
+        
+        if (c == 'e' && (position + 1 == expression.length() || 
+            !Character.isLetterOrDigit(expression.charAt(position + 1)))) {
+            position++;
+            return new ConstantNode("e");
+        }
+
         if (c == 'x') {
             position++;
             return new VariableNode();
