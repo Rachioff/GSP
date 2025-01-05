@@ -1291,62 +1291,43 @@
 
                         if (screenPoints.length === 0) return [];
 
-                        // 找到最近邻点并绘制
+                        // 按 x 坐标排序点
+                        const sortedPoints = screenPoints.sort((a, b) => a.mathX - b.mathX);
+
+                        // 将点分成上下两部分（对于椭圆来说）
+                        const midX = (Math.min(...sortedPoints.map(p => p.mathX)) + 
+                                    Math.max(...sortedPoints.map(p => p.mathX))) / 2;
+                        
+                        const leftPoints = sortedPoints.filter(p => p.mathX <= midX)
+                                                    .sort((a, b) => b.mathY - a.mathY);
+                        const rightPoints = sortedPoints.filter(p => p.mathX > midX)
+                                                    .sort((a, b) => a.mathY - b.mathY);
+
+                        // 绘制图形
                         ctx.value.strokeStyle = color;
                         ctx.value.lineWidth = 2;
-                        
-                        // 找到一个起始点（可以是最左边的点）
-                        let currentPoint = screenPoints[0];
-                        let remainingPoints = screenPoints.slice(1);
-                        let usedPoints = [currentPoint];
-                        
                         ctx.value.beginPath();
-                        ctx.value.moveTo(currentPoint.x, currentPoint.y);
 
-                        const maxDistance = 100; // 最大连接距离，可以根据需要调整
-
-                        // 连接最近的点，直到没有合适的点可连接
-                        while (remainingPoints.length > 0) {
-                            // 找到距离当前点最近的点
-                            let minDistance = Infinity;
-                            let nextPointIndex = -1;
-
-                            remainingPoints.forEach((point, index) => {
-                                const distance = Math.sqrt(
-                                    Math.pow(point.x - currentPoint.x, 2) + 
-                                    Math.pow(point.y - currentPoint.y, 2)
-                                );
-                                
-                                if (distance < minDistance && distance < maxDistance) {
-                                    minDistance = distance;
-                                    nextPointIndex = index;
-                                }
-                            });
-
-                            // 如果没有找到合适的下一个点，开始新的路径
-                            if (nextPointIndex === -1) {
-                                ctx.value.stroke();
-                                
-                                if (remainingPoints.length > 0) {
-                                    currentPoint = remainingPoints[0];
-                                    remainingPoints = remainingPoints.slice(1);
-                                    ctx.value.beginPath();
-                                    ctx.value.moveTo(currentPoint.x, currentPoint.y);
-                                    usedPoints.push(currentPoint);
-                                }
-                            } else {
-                                // 连接到下一个点
-                                currentPoint = remainingPoints[nextPointIndex];
-                                remainingPoints.splice(nextPointIndex, 1);
-                                ctx.value.lineTo(currentPoint.x, currentPoint.y);
-                                usedPoints.push(currentPoint);
+                        // 从左侧开始绘制
+                        if (leftPoints.length > 0) {
+                            ctx.value.moveTo(leftPoints[0].x, leftPoints[0].y);
+                            for (const point of leftPoints) {
+                                ctx.value.lineTo(point.x, point.y);
                             }
                         }
 
-                        // 绘制最后一段
-                        ctx.value.stroke();
+                        // 继续绘制右侧
+                        for (const point of rightPoints) {
+                            ctx.value.lineTo(point.x, point.y);
+                        }
 
-                        return usedPoints;
+                        // 如果是封闭图形（比如椭圆），则回到起点
+                        if (expr.includes('+') && !expr.includes('-')) {  // 简单判断是否为椭圆
+                            ctx.value.closePath();
+                        }
+
+                        ctx.value.stroke();
+                        return [...leftPoints, ...rightPoints];
                     } catch (err) {
                         console.error('Error drawing shape:', err);
                         return [];
